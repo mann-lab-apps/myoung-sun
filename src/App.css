@@ -83,14 +83,19 @@ a:focus-visible {
   font-size: 0.95rem;
 }
 
-.home {
+.home,
+.onboarding,
+.ready,
+.practice-start {
   display: grid;
   min-height: calc(100vh - 84px);
   align-items: center;
   padding: 20px clamp(18px, 5vw, 48px) 48px;
 }
 
-.intro {
+.intro,
+.step-panel,
+.ready-panel {
   display: grid;
   gap: 28px;
   max-width: 780px;
@@ -128,7 +133,8 @@ h1 {
 }
 
 .primary-button,
-.secondary-button {
+.secondary-button,
+.quiet-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -148,23 +154,83 @@ h1 {
   color: #243230;
 }
 
+.quiet-button {
+  min-width: 124px;
+  background: transparent;
+  color: #3f4946;
+}
+
+.step-panel,
+.ready-panel {
+  width: min(100%, 760px);
+}
+
+.step-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  max-width: 360px;
+  color: #1d5f58;
+  font-weight: 800;
+}
+
+.step-status span,
+.step-status strong {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #d9ece8;
+}
+
+.step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.ready-icon {
+  color: #377e78;
+}
+
+.sample-prompt {
+  width: min(100%, 680px);
+  margin: 0;
+  padding: 22px;
+  border: 2px solid #377e78;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #243230;
+  font-size: clamp(1.15rem, 4vw, 1.5rem);
+  font-weight: 800;
+}
+
 @media (max-width: 560px) {
   .app-header {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .home {
+  .home,
+  .onboarding,
+  .ready,
+  .practice-start {
     align-items: start;
     padding-top: 28px;
   }
 
-  .actions {
+  .actions,
+  .step-actions {
     flex-direction: column;
   }
 
   .primary-button,
-  .secondary-button {
+  .secondary-button,
+  .quiet-button {
     width: 100%;
   }
 }
