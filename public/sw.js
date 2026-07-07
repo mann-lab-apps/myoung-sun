@@ -1,5 +1,6 @@
 const CACHE_NAME = "myoung-sun-v1";
-const APP_SHELL = ["/", "/manifest.webmanifest", "/icons/icon.svg", "/icons/maskable.svg"];
+const APP_SHELL = ["./", "./manifest.webmanifest", "./icons/icon.svg", "./icons/maskable.svg"];
+const APP_HOME = new URL("./", self.registration.scope).toString();
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
@@ -28,7 +29,7 @@ self.addEventListener("fetch", (event) => {
         return cached;
       }
 
-      return fetch(event.request).catch(() => caches.match("/"));
+      return fetch(event.request).catch(() => caches.match(APP_HOME));
     }),
   );
 });
