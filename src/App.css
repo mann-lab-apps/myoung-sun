@@ -90,7 +90,6 @@ a:focus-visible {
 .home,
 .onboarding,
 .ready,
-.practice-start,
 .tutorials,
 .tutorial {
   display: grid;
@@ -261,54 +260,6 @@ h2 {
   font-weight: 800;
 }
 
-.practice-box textarea {
-  width: 100%;
-  min-height: 190px;
-  resize: vertical;
-  padding: 18px;
-  border: 2px solid #377e78;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #243230;
-  font-size: clamp(1.1rem, 3.5vw, 1.35rem);
-  line-height: 1.55;
-}
-
-.practice-box textarea:focus-visible {
-  outline: 4px solid #2454d6;
-  outline-offset: 3px;
-}
-
-.choice-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
-  gap: 12px;
-  width: min(100%, 720px);
-}
-
-.choice-button {
-  min-height: 68px;
-  padding: 16px;
-  border: 2px solid #d7cec0;
-  background: #ffffff;
-  color: #243230;
-  font-weight: 800;
-}
-
-.choice-button.selected {
-  border-color: #377e78;
-  background: #d9ece8;
-  color: #1d5f58;
-}
-
-.result-note {
-  margin: 0;
-  padding: 16px;
-  border-radius: 8px;
-  background: #f4e4da;
-  color: #78402f;
-}
-
 @media (max-width: 560px) {
   .app-header {
     align-items: flex-start;
@@ -318,7 +269,6 @@ h2 {
   .home,
   .onboarding,
   .ready,
-  .practice-start,
   .tutorials,
   .tutorial {
     align-items: start;

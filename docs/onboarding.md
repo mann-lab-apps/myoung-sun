@@ -22,4 +22,4 @@ The first-run experience should help a hesitant user feel that nothing bad happe
 
 - The home screen leads directly into onboarding.
 - The onboarding can be completed without outside help.
-- The final state prepares the user for the first tutorial.
+- The final state prepares the user to open the first ChatGPT guide.

@@ -1,13 +1,6 @@
-import {
-  ArrowLeft,
-  ArrowRight,
-  CheckCircle2,
-  Home,
-  ListChecks,
-  RotateCcw,
-} from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Home, ListChecks, RotateCcw } from "lucide-react";
 import { useMemo, useState } from "react";
-import { tutorials, type Tutorial } from "./tutorialData";
+import { guides, type Guide } from "./tutorialData";
 import "./App.css";
 
 const onboardingSteps = [
@@ -19,41 +12,39 @@ const onboardingSteps = [
   },
   {
     eyebrow: "2단계",
-    title: "한 번에 하나만 해요",
-    body: "화면마다 해야 할 일을 하나씩 보여드릴게요. 읽고, 누르고, 다음으로 가면 됩니다.",
+    title: "ChatGPT에 들어가요",
+    body: "삼성 인터넷이나 Chrome에서 chatgpt.com을 열고, 로그인한 뒤 아래 입력칸에 말을 적어볼 거예요.",
     action: "다음으로",
   },
   {
     eyebrow: "3단계",
-    title: "AI에게 짧게 물어봐요",
-    body: "처음에는 예시 문장을 그대로 따라 해도 됩니다. 익숙해지면 내 말로 조금씩 바꿔 볼 거예요.",
-    action: "첫 연습 시작",
+    title: "생각을 말로 풀어봐요",
+    body: "처음에는 예시 문장을 그대로 써도 됩니다. ChatGPT가 질문을 하나씩 하도록 부탁하면 훨씬 편해요.",
+    action: "첫 가이드 보기",
   },
 ];
 
-type Screen = "home" | "onboarding" | "ready" | "tutorials" | "tutorial";
+type Screen = "home" | "onboarding" | "ready" | "guides" | "guide";
 
 export function App() {
   const [screen, setScreen] = useState<Screen>("home");
   const [onboardingStepIndex, setOnboardingStepIndex] = useState(0);
-  const [selectedTutorial, setSelectedTutorial] = useState<Tutorial>(tutorials[0]);
-  const [tutorialStepIndex, setTutorialStepIndex] = useState(0);
-  const [draft, setDraft] = useState("");
-  const [selectedOption, setSelectedOption] = useState("");
+  const [selectedGuide, setSelectedGuide] = useState<Guide>(guides[0]);
+  const [guideStepIndex, setGuideStepIndex] = useState(0);
 
   const currentStep = onboardingSteps[onboardingStepIndex];
+  const currentGuideStep = selectedGuide.steps[guideStepIndex];
   const isLastOnboardingStep = onboardingStepIndex === onboardingSteps.length - 1;
-  const currentTutorialStep = selectedTutorial.steps[tutorialStepIndex];
-  const isLastTutorialStep = tutorialStepIndex === selectedTutorial.steps.length - 1;
+  const isLastGuideStep = guideStepIndex === selectedGuide.steps.length - 1;
 
   const onboardingProgressText = useMemo(
     () => `${onboardingStepIndex + 1} / ${onboardingSteps.length}`,
     [onboardingStepIndex],
   );
 
-  const tutorialProgressText = useMemo(
-    () => `${tutorialStepIndex + 1} / ${selectedTutorial.steps.length}`,
-    [selectedTutorial.steps.length, tutorialStepIndex],
+  const guideProgressText = useMemo(
+    () => `${guideStepIndex + 1} / ${selectedGuide.steps.length}`,
+    [guideStepIndex, selectedGuide.steps.length],
   );
 
   const startOnboarding = () => {
@@ -61,12 +52,10 @@ export function App() {
     setScreen("onboarding");
   };
 
-  const openTutorial = (tutorial: Tutorial) => {
-    setSelectedTutorial(tutorial);
-    setTutorialStepIndex(0);
-    setDraft(tutorial.steps[0].prompt);
-    setSelectedOption("");
-    setScreen("tutorial");
+  const openGuide = (guide: Guide) => {
+    setSelectedGuide(guide);
+    setGuideStepIndex(0);
+    setScreen("guide");
   };
 
   const goNextOnboarding = () => {
@@ -87,28 +76,22 @@ export function App() {
     setOnboardingStepIndex((index) => index - 1);
   };
 
-  const goNextTutorial = () => {
-    if (isLastTutorialStep) {
-      setScreen("tutorials");
+  const goNextGuide = () => {
+    if (isLastGuideStep) {
+      setScreen("guides");
       return;
     }
 
-    const nextIndex = tutorialStepIndex + 1;
-    setTutorialStepIndex(nextIndex);
-    setDraft(selectedTutorial.steps[nextIndex].prompt);
-    setSelectedOption("");
+    setGuideStepIndex((index) => index + 1);
   };
 
-  const goBackTutorial = () => {
-    if (tutorialStepIndex === 0) {
-      setScreen("tutorials");
+  const goBackGuide = () => {
+    if (guideStepIndex === 0) {
+      setScreen("guides");
       return;
     }
 
-    const previousIndex = tutorialStepIndex - 1;
-    setTutorialStepIndex(previousIndex);
-    setDraft(selectedTutorial.steps[previousIndex].prompt);
-    setSelectedOption("");
+    setGuideStepIndex((index) => index - 1);
   };
 
   return (
@@ -120,26 +103,26 @@ export function App() {
           </span>
           <span>명선</span>
         </button>
-        <p>AI 질문 연습 앱</p>
+        <p>ChatGPT 생각정리 가이드</p>
       </header>
 
       <main>
         {screen === "home" ? (
           <section className="home" aria-labelledby="home-title">
             <div className="intro">
-              <p className="eyebrow">삼성폰에서 바로 쓰는 연습</p>
-              <h1 id="home-title">천천히 물어봐도 괜찮아요</h1>
+              <p className="eyebrow">삼성폰에서 천천히</p>
+              <h1 id="home-title">ChatGPT에 말 걸어봐요</h1>
               <p className="lead">
-                AI에게 질문하는 일을 작은 단계로 나누어 연습합니다. 잘못 눌러도 다시 하면 되고,
-                어려운 말은 쉬운 말로 바꿔 볼 수 있어요.
+                어디에 들어가서, 어디에 쓰면 되는지부터 짧게 안내합니다. 익숙해지면
+                ChatGPT와 이야기하며 마음과 생각을 정리해볼 수 있어요.
               </p>
               <div className="actions">
                 <button className="primary-button" type="button" onClick={startOnboarding}>
                   시작하기
                   <ArrowRight size={24} aria-hidden="true" />
                 </button>
-                <button className="secondary-button" type="button" onClick={() => setScreen("tutorials")}>
-                  바로 연습하기
+                <button className="secondary-button" type="button" onClick={() => setScreen("guides")}>
+                  가이드 보기
                   <ListChecks size={22} aria-hidden="true" />
                 </button>
               </div>
@@ -171,7 +154,7 @@ export function App() {
                   <ArrowLeft size={22} aria-hidden="true" />
                   뒤로
                 </button>
-                <button className="quiet-button" type="button" onClick={() => setScreen("tutorials")}>
+                <button className="quiet-button" type="button" onClick={() => setScreen("guides")}>
                   건너뛰기
                 </button>
               </div>
@@ -184,17 +167,14 @@ export function App() {
             <div className="ready-panel">
               <CheckCircle2 className="ready-icon" size={48} aria-hidden="true" />
               <p className="eyebrow">준비 완료</p>
-              <h1 id="ready-title">이제 첫 문장을 따라 해볼게요</h1>
+              <h1 id="ready-title">먼저 접속부터 해볼게요</h1>
               <p className="lead">
-                예시 문장을 그대로 눌러 보고, 빈칸만 바꿔 보면서 AI 질문을 연습합니다.
+                ChatGPT 페이지에 들어가고 로그인한 다음, 아래 입력칸에 예시 문장을 써보는
+                흐름으로 안내합니다.
               </p>
               <div className="actions">
-                <button
-                  className="primary-button"
-                  type="button"
-                  onClick={() => openTutorial(tutorials[0])}
-                >
-                  첫 연습으로 가기
+                <button className="primary-button" type="button" onClick={() => openGuide(guides[0])}>
+                  첫 가이드로 가기
                   <ArrowRight size={24} aria-hidden="true" />
                 </button>
                 <button className="secondary-button" type="button" onClick={startOnboarding}>
@@ -206,27 +186,25 @@ export function App() {
           </section>
         ) : null}
 
-        {screen === "tutorials" ? (
-          <section className="tutorials" aria-labelledby="tutorials-title">
+        {screen === "guides" ? (
+          <section className="tutorials" aria-labelledby="guides-title">
             <div className="section-heading">
-              <p className="eyebrow">연습 고르기</p>
-              <h1 id="tutorials-title">오늘 필요한 상황을 골라요</h1>
-              <p className="lead">각 연습은 따라하기, 바꿔보기, 골라보기, 직접하기로 이어집니다.</p>
+              <p className="eyebrow">가이드 고르기</p>
+              <h1 id="guides-title">필요한 것만 짧게 봐요</h1>
+              <p className="lead">
+                ChatGPT 접속, 첫 문장 입력, 생각정리 대화만 간단하게 안내합니다.
+              </p>
             </div>
 
             <div className="tutorial-grid">
-              {tutorials.map((tutorial) => (
-                <article className="tutorial-card" key={tutorial.id}>
+              {guides.map((guide) => (
+                <article className="tutorial-card" key={guide.id}>
                   <div>
-                    <h2>{tutorial.title}</h2>
-                    <p>{tutorial.situation}</p>
+                    <h2>{guide.title}</h2>
+                    <p>{guide.summary}</p>
                   </div>
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    onClick={() => openTutorial(tutorial)}
-                  >
-                    연습 시작
+                  <button className="secondary-button" type="button" onClick={() => openGuide(guide)}>
+                    보기
                     <ArrowRight size={22} aria-hidden="true" />
                   </button>
                 </article>
@@ -235,38 +213,37 @@ export function App() {
           </section>
         ) : null}
 
-        {screen === "tutorial" ? (
-          <section className="tutorial" aria-labelledby="tutorial-title">
+        {screen === "guide" ? (
+          <section className="tutorial" aria-labelledby="guide-title">
             <div className="tutorial-panel">
-              <div className="step-status" aria-label={`튜토리얼 ${tutorialProgressText}`}>
-                <span>{currentTutorialStep.label}</span>
-                <strong>{tutorialProgressText}</strong>
+              <div className="step-status" aria-label={`가이드 ${guideProgressText}`}>
+                <span>{currentGuideStep.label}</span>
+                <strong>{guideProgressText}</strong>
               </div>
 
               <div className="section-heading">
-                <p className="eyebrow">{selectedTutorial.title}</p>
-                <h1 id="tutorial-title">{currentTutorialStep.title}</h1>
-                <p className="lead">{currentTutorialStep.instruction}</p>
+                <p className="eyebrow">{selectedGuide.title}</p>
+                <h1 id="guide-title">{currentGuideStep.title}</h1>
+                <p className="lead">{currentGuideStep.body}</p>
               </div>
 
-              <PromptPractice
-                draft={draft}
-                selectedOption={selectedOption}
-                step={currentTutorialStep}
-                onDraftChange={setDraft}
-                onOptionSelect={setSelectedOption}
-              />
+              {currentGuideStep.prompt ? (
+                <div className="practice-box">
+                  <span>입력칸에 써볼 말</span>
+                  <p className="sample-prompt">{currentGuideStep.prompt}</p>
+                </div>
+              ) : null}
 
               <div className="step-actions">
-                <button className="primary-button" type="button" onClick={goNextTutorial}>
-                  {isLastTutorialStep ? "마치기" : "다음"}
-                  {isLastTutorialStep ? (
+                <button className="primary-button" type="button" onClick={goNextGuide}>
+                  {isLastGuideStep ? "가이드 끝" : "다음"}
+                  {isLastGuideStep ? (
                     <CheckCircle2 size={24} aria-hidden="true" />
                   ) : (
                     <ArrowRight size={24} aria-hidden="true" />
                   )}
                 </button>
-                <button className="quiet-button" type="button" onClick={goBackTutorial}>
+                <button className="quiet-button" type="button" onClick={goBackGuide}>
                   <ArrowLeft size={22} aria-hidden="true" />
                   뒤로
                 </button>
@@ -276,64 +253,5 @@ export function App() {
         ) : null}
       </main>
     </div>
-  );
-}
-
-type PromptPracticeProps = {
-  draft: string;
-  selectedOption: string;
-  step: Tutorial["steps"][number];
-  onDraftChange: (value: string) => void;
-  onOptionSelect: (value: string) => void;
-};
-
-function PromptPractice({
-  draft,
-  selectedOption,
-  step,
-  onDraftChange,
-  onOptionSelect,
-}: PromptPracticeProps) {
-  if (step.kind === "choose") {
-    return (
-      <div className="practice-box">
-        <p className="sample-prompt">{step.prompt}</p>
-        <div className="choice-list" aria-label="답변 방식 선택">
-          {step.options?.map((option) => (
-            <button
-              className={selectedOption === option ? "choice-button selected" : "choice-button"}
-              key={option}
-              type="button"
-              onClick={() => onOptionSelect(option)}
-            >
-              {option}
-            </button>
-          ))}
-        </div>
-        {selectedOption ? <p className="result-note">좋아요. "{selectedOption}" 방식으로 부탁해요.</p> : null}
-      </div>
-    );
-  }
-
-  if (step.kind === "follow") {
-    return (
-      <div className="practice-box">
-        <p className="sample-prompt">{step.prompt}</p>
-        <button className="secondary-button" type="button" onClick={() => onDraftChange(step.prompt)}>
-          이 문장 따라하기
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <label className="practice-box">
-      <span>{step.kind === "fill" ? "바꿔 볼 문장" : "내가 써 보는 문장"}</span>
-      <textarea
-        value={draft}
-        rows={5}
-        onChange={(event) => onDraftChange(event.target.value)}
-      />
-    </label>
   );
 }
