@@ -101,7 +101,7 @@ export function App() {
           <span className="brand-mark" aria-hidden="true">
             <Home size={24} strokeWidth={2.4} />
           </span>
-          <span>명선</span>
+          <span>명순</span>
         </button>
         <p>ChatGPT 생각정리 가이드</p>
       </header>
