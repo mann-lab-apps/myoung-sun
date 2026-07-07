@@ -1,0 +1,170 @@
+:root {
+  color: #243230;
+  background: #fffaf4;
+  font-family:
+    Pretendard,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  font-size: 18px;
+  line-height: 1.55;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: #fffaf4;
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  min-height: 52px;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 4px solid #2454d6;
+  outline-offset: 3px;
+}
+
+.app-shell {
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, rgba(247, 239, 228, 0.95), rgba(255, 250, 244, 0.98)),
+    #fffaf4;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px clamp(18px, 5vw, 48px);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 800;
+}
+
+.brand-mark {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 8px;
+  background: #377e78;
+  color: #fffaf4;
+}
+
+.app-header p {
+  margin: 0;
+  color: #59625f;
+  font-size: 0.95rem;
+}
+
+.home {
+  display: grid;
+  min-height: calc(100vh - 84px);
+  align-items: center;
+  padding: 20px clamp(18px, 5vw, 48px) 48px;
+}
+
+.intro {
+  display: grid;
+  gap: 28px;
+  max-width: 780px;
+}
+
+.eyebrow {
+  width: fit-content;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #d9ece8;
+  color: #1d5f58;
+  font-weight: 800;
+}
+
+h1 {
+  max-width: 12ch;
+  margin: 0;
+  color: #243230;
+  font-size: clamp(2.4rem, 9vw, 4.8rem);
+  line-height: 1.05;
+}
+
+.lead {
+  max-width: 34rem;
+  margin: 0;
+  color: #3f4946;
+  font-size: clamp(1.15rem, 4vw, 1.55rem);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.primary-button,
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 180px;
+  padding: 14px 20px;
+  font-weight: 800;
+}
+
+.primary-button {
+  background: #ca5c43;
+  color: #fffaf4;
+}
+
+.secondary-button {
+  background: #e4ded4;
+  color: #243230;
+}
+
+@media (max-width: 560px) {
+  .app-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .home {
+    align-items: start;
+    padding-top: 28px;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+
+  .primary-button,
+  .secondary-button {
+    width: 100%;
+  }
+}
