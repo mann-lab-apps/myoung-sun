@@ -1,5 +1,13 @@
-import { ArrowLeft, ArrowRight, CheckCircle2, Home, RotateCcw } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  Home,
+  ListChecks,
+  RotateCcw,
+} from "lucide-react";
 import { useMemo, useState } from "react";
+import { tutorials, type Tutorial } from "./tutorialData";
 import "./App.css";
 
 const onboardingSteps = [
@@ -23,51 +31,95 @@ const onboardingSteps = [
   },
 ];
 
-type Screen = "home" | "onboarding" | "ready" | "firstPractice";
+type Screen = "home" | "onboarding" | "ready" | "tutorials" | "tutorial";
 
 export function App() {
   const [screen, setScreen] = useState<Screen>("home");
-  const [stepIndex, setStepIndex] = useState(0);
-  const currentStep = onboardingSteps[stepIndex];
-  const isLastStep = stepIndex === onboardingSteps.length - 1;
+  const [onboardingStepIndex, setOnboardingStepIndex] = useState(0);
+  const [selectedTutorial, setSelectedTutorial] = useState<Tutorial>(tutorials[0]);
+  const [tutorialStepIndex, setTutorialStepIndex] = useState(0);
+  const [draft, setDraft] = useState("");
+  const [selectedOption, setSelectedOption] = useState("");
 
-  const progressText = useMemo(
-    () => `${stepIndex + 1} / ${onboardingSteps.length}`,
-    [stepIndex],
+  const currentStep = onboardingSteps[onboardingStepIndex];
+  const isLastOnboardingStep = onboardingStepIndex === onboardingSteps.length - 1;
+  const currentTutorialStep = selectedTutorial.steps[tutorialStepIndex];
+  const isLastTutorialStep = tutorialStepIndex === selectedTutorial.steps.length - 1;
+
+  const onboardingProgressText = useMemo(
+    () => `${onboardingStepIndex + 1} / ${onboardingSteps.length}`,
+    [onboardingStepIndex],
+  );
+
+  const tutorialProgressText = useMemo(
+    () => `${tutorialStepIndex + 1} / ${selectedTutorial.steps.length}`,
+    [selectedTutorial.steps.length, tutorialStepIndex],
   );
 
   const startOnboarding = () => {
-    setStepIndex(0);
+    setOnboardingStepIndex(0);
     setScreen("onboarding");
   };
 
-  const goNext = () => {
-    if (isLastStep) {
+  const openTutorial = (tutorial: Tutorial) => {
+    setSelectedTutorial(tutorial);
+    setTutorialStepIndex(0);
+    setDraft(tutorial.steps[0].prompt);
+    setSelectedOption("");
+    setScreen("tutorial");
+  };
+
+  const goNextOnboarding = () => {
+    if (isLastOnboardingStep) {
       setScreen("ready");
       return;
     }
 
-    setStepIndex((index) => index + 1);
+    setOnboardingStepIndex((index) => index + 1);
   };
 
-  const goBack = () => {
-    if (stepIndex === 0) {
+  const goBackOnboarding = () => {
+    if (onboardingStepIndex === 0) {
       setScreen("home");
       return;
     }
 
-    setStepIndex((index) => index - 1);
+    setOnboardingStepIndex((index) => index - 1);
+  };
+
+  const goNextTutorial = () => {
+    if (isLastTutorialStep) {
+      setScreen("tutorials");
+      return;
+    }
+
+    const nextIndex = tutorialStepIndex + 1;
+    setTutorialStepIndex(nextIndex);
+    setDraft(selectedTutorial.steps[nextIndex].prompt);
+    setSelectedOption("");
+  };
+
+  const goBackTutorial = () => {
+    if (tutorialStepIndex === 0) {
+      setScreen("tutorials");
+      return;
+    }
+
+    const previousIndex = tutorialStepIndex - 1;
+    setTutorialStepIndex(previousIndex);
+    setDraft(selectedTutorial.steps[previousIndex].prompt);
+    setSelectedOption("");
   };
 
   return (
     <div className="app-shell">
       <header className="app-header" aria-label="앱 정보">
-        <div className="brand">
+        <button className="brand-button" type="button" onClick={() => setScreen("home")}>
           <span className="brand-mark" aria-hidden="true">
             <Home size={24} strokeWidth={2.4} />
           </span>
           <span>명선</span>
-        </div>
+        </button>
         <p>AI 질문 연습 앱</p>
       </header>
 
@@ -86,8 +138,9 @@ export function App() {
                   시작하기
                   <ArrowRight size={24} aria-hidden="true" />
                 </button>
-                <button className="secondary-button" type="button" onClick={() => setScreen("ready")}>
+                <button className="secondary-button" type="button" onClick={() => setScreen("tutorials")}>
                   바로 연습하기
+                  <ListChecks size={22} aria-hidden="true" />
                 </button>
               </div>
             </div>
@@ -97,28 +150,28 @@ export function App() {
         {screen === "onboarding" ? (
           <section className="onboarding" aria-labelledby="onboarding-title">
             <div className="step-panel">
-              <div className="step-status" aria-label={`온보딩 ${progressText}`}>
+              <div className="step-status" aria-label={`온보딩 ${onboardingProgressText}`}>
                 <span>{currentStep.eyebrow}</span>
-                <strong>{progressText}</strong>
+                <strong>{onboardingProgressText}</strong>
               </div>
 
               <h1 id="onboarding-title">{currentStep.title}</h1>
               <p className="lead">{currentStep.body}</p>
 
               <div className="step-actions">
-                <button className="primary-button" type="button" onClick={goNext}>
+                <button className="primary-button" type="button" onClick={goNextOnboarding}>
                   {currentStep.action}
-                  {isLastStep ? (
+                  {isLastOnboardingStep ? (
                     <CheckCircle2 size={24} aria-hidden="true" />
                   ) : (
                     <ArrowRight size={24} aria-hidden="true" />
                   )}
                 </button>
-                <button className="quiet-button" type="button" onClick={goBack}>
+                <button className="quiet-button" type="button" onClick={goBackOnboarding}>
                   <ArrowLeft size={22} aria-hidden="true" />
                   뒤로
                 </button>
-                <button className="quiet-button" type="button" onClick={() => setScreen("ready")}>
+                <button className="quiet-button" type="button" onClick={() => setScreen("tutorials")}>
                   건너뛰기
                 </button>
               </div>
@@ -133,11 +186,14 @@ export function App() {
               <p className="eyebrow">준비 완료</p>
               <h1 id="ready-title">이제 첫 문장을 따라 해볼게요</h1>
               <p className="lead">
-                다음 단계에서는 예시 문장을 그대로 눌러 보고, 빈칸만 바꿔 보면서 AI 질문을
-                연습합니다.
+                예시 문장을 그대로 눌러 보고, 빈칸만 바꿔 보면서 AI 질문을 연습합니다.
               </p>
               <div className="actions">
-                <button className="primary-button" type="button" onClick={() => setScreen("firstPractice")}>
+                <button
+                  className="primary-button"
+                  type="button"
+                  onClick={() => openTutorial(tutorials[0])}
+                >
                   첫 연습으로 가기
                   <ArrowRight size={24} aria-hidden="true" />
                 </button>
@@ -150,22 +206,69 @@ export function App() {
           </section>
         ) : null}
 
-        {screen === "firstPractice" ? (
-          <section className="practice-start" aria-labelledby="practice-start-title">
-            <div className="ready-panel">
-              <p className="eyebrow">첫 연습</p>
-              <h1 id="practice-start-title">이 문장을 그대로 따라 해봐요</h1>
-              <p className="sample-prompt">
-                안내문을 쉬운 말로 바꿔줘. 중요한 내용은 세 가지만 알려줘.
-              </p>
-              <div className="actions">
-                <button className="primary-button" type="button">
-                  따라 해봤어요
-                  <CheckCircle2 size={24} aria-hidden="true" />
+        {screen === "tutorials" ? (
+          <section className="tutorials" aria-labelledby="tutorials-title">
+            <div className="section-heading">
+              <p className="eyebrow">연습 고르기</p>
+              <h1 id="tutorials-title">오늘 필요한 상황을 골라요</h1>
+              <p className="lead">각 연습은 따라하기, 바꿔보기, 골라보기, 직접하기로 이어집니다.</p>
+            </div>
+
+            <div className="tutorial-grid">
+              {tutorials.map((tutorial) => (
+                <article className="tutorial-card" key={tutorial.id}>
+                  <div>
+                    <h2>{tutorial.title}</h2>
+                    <p>{tutorial.situation}</p>
+                  </div>
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() => openTutorial(tutorial)}
+                  >
+                    연습 시작
+                    <ArrowRight size={22} aria-hidden="true" />
+                  </button>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {screen === "tutorial" ? (
+          <section className="tutorial" aria-labelledby="tutorial-title">
+            <div className="tutorial-panel">
+              <div className="step-status" aria-label={`튜토리얼 ${tutorialProgressText}`}>
+                <span>{currentTutorialStep.label}</span>
+                <strong>{tutorialProgressText}</strong>
+              </div>
+
+              <div className="section-heading">
+                <p className="eyebrow">{selectedTutorial.title}</p>
+                <h1 id="tutorial-title">{currentTutorialStep.title}</h1>
+                <p className="lead">{currentTutorialStep.instruction}</p>
+              </div>
+
+              <PromptPractice
+                draft={draft}
+                selectedOption={selectedOption}
+                step={currentTutorialStep}
+                onDraftChange={setDraft}
+                onOptionSelect={setSelectedOption}
+              />
+
+              <div className="step-actions">
+                <button className="primary-button" type="button" onClick={goNextTutorial}>
+                  {isLastTutorialStep ? "마치기" : "다음"}
+                  {isLastTutorialStep ? (
+                    <CheckCircle2 size={24} aria-hidden="true" />
+                  ) : (
+                    <ArrowRight size={24} aria-hidden="true" />
+                  )}
                 </button>
-                <button className="secondary-button" type="button" onClick={startOnboarding}>
-                  <RotateCcw size={22} aria-hidden="true" />
-                  다시 보기
+                <button className="quiet-button" type="button" onClick={goBackTutorial}>
+                  <ArrowLeft size={22} aria-hidden="true" />
+                  뒤로
                 </button>
               </div>
             </div>
@@ -173,5 +276,64 @@ export function App() {
         ) : null}
       </main>
     </div>
+  );
+}
+
+type PromptPracticeProps = {
+  draft: string;
+  selectedOption: string;
+  step: Tutorial["steps"][number];
+  onDraftChange: (value: string) => void;
+  onOptionSelect: (value: string) => void;
+};
+
+function PromptPractice({
+  draft,
+  selectedOption,
+  step,
+  onDraftChange,
+  onOptionSelect,
+}: PromptPracticeProps) {
+  if (step.kind === "choose") {
+    return (
+      <div className="practice-box">
+        <p className="sample-prompt">{step.prompt}</p>
+        <div className="choice-list" aria-label="답변 방식 선택">
+          {step.options?.map((option) => (
+            <button
+              className={selectedOption === option ? "choice-button selected" : "choice-button"}
+              key={option}
+              type="button"
+              onClick={() => onOptionSelect(option)}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+        {selectedOption ? <p className="result-note">좋아요. "{selectedOption}" 방식으로 부탁해요.</p> : null}
+      </div>
+    );
+  }
+
+  if (step.kind === "follow") {
+    return (
+      <div className="practice-box">
+        <p className="sample-prompt">{step.prompt}</p>
+        <button className="secondary-button" type="button" onClick={() => onDraftChange(step.prompt)}>
+          이 문장 따라하기
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <label className="practice-box">
+      <span>{step.kind === "fill" ? "바꿔 볼 문장" : "내가 써 보는 문장"}</span>
+      <textarea
+        value={draft}
+        rows={5}
+        onChange={(event) => onDraftChange(event.target.value)}
+      />
+    </label>
   );
 }
