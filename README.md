@@ -10,6 +10,12 @@ The MVP starts as a PWA so it can be opened on a Samsung Android phone, added to
 
 See [docs/platform.md](docs/platform.md) for the platform decision and Android transition notes.
 
+## Deployment
+
+The web app is deployed with GitHub Pages:
+
+https://mann-lab-apps.github.io/myoung-sun/
+
 ## Development
 
 ```bash
