@@ -43,7 +43,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final String CHATGPT_URL = "https://chatgpt.com/?locale=ko-KR";
-    private static final String FEEDBACK_EMAIL = "daga4242@gmail.com";
+    private static final String GITHUB_ISSUE_URL = "https://github.com/mann-lab-apps/myoung-sun/issues/new";
     private static final String STATE_SCREEN = "screen";
     private static final String STATE_CURRENT_URL = "currentUrl";
     private static final String STATE_GUIDE_STEP_INDEX = "guideStepIndex";
@@ -850,7 +850,7 @@ public class MainActivity extends Activity {
         TextView title = createText("의견 보내기", 28, Color.rgb(23, 33, 31));
         panel.addView(title);
 
-        TextView body = createText("의견은 이메일 작성 화면으로 열립니다. 적은 내용을 확인한 뒤 보내세요.", 19, Color.rgb(51, 64, 61));
+        TextView body = createText("GitHub 이슈 작성 화면으로 열립니다. 내용을 확인한 뒤 등록 버튼을 눌러주세요.", 19, Color.rgb(51, 64, 61));
         body.setPadding(0, dp(8), 0, dp(12));
         panel.addView(body);
 
@@ -882,7 +882,7 @@ public class MainActivity extends Activity {
         Button cancelButton = createSecondaryButton("닫기");
         cancelButton.setOnClickListener(v -> dialog.dismiss());
 
-        Button sendButton = createButton("이메일 작성하기");
+        Button sendButton = createButton("이슈 작성하기");
         sendButton.setOnClickListener(v -> {
             String message = input.getText().toString().trim();
             if (message.isEmpty()) {
@@ -931,10 +931,10 @@ public class MainActivity extends Activity {
         panel.setPadding(dp(22), dp(22), dp(22), dp(18));
         panel.setBackgroundColor(Color.rgb(255, 253, 248));
 
-        TextView title = createText("이메일로 보낼게요", 28, Color.rgb(23, 33, 31));
+        TextView title = createText("이슈로 남길게요", 28, Color.rgb(23, 33, 31));
         panel.addView(title);
 
-        TextView body = createText("이메일 작성 화면으로 이동합니다. 비밀번호, 인증번호, 개인 정보가 없으면 계속하세요.", 19, Color.rgb(51, 64, 61));
+        TextView body = createText("GitHub 이슈 작성 화면으로 이동합니다. 비밀번호, 인증번호, 개인 정보가 없으면 계속하세요.", 19, Color.rgb(51, 64, 61));
         body.setPadding(0, dp(8), 0, dp(12));
         panel.addView(body);
 
@@ -944,11 +944,11 @@ public class MainActivity extends Activity {
         Button cancelButton = createSecondaryButton("다시 쓰기");
         cancelButton.setOnClickListener(v -> confirmDialog.dismiss());
 
-        Button continueButton = createButton("이메일 열기");
+        Button continueButton = createButton("GitHub 열기");
         continueButton.setOnClickListener(v -> {
             confirmDialog.dismiss();
             feedbackDialog.dismiss();
-            openFeedbackEmail(message);
+            openFeedbackIssue(message);
         });
 
         LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
@@ -979,17 +979,18 @@ public class MainActivity extends Activity {
         return Math.max(dp(320), screenWidth - (horizontalMargin * 2));
     }
 
-    private void openFeedbackEmail(String message) {
-        Intent intent = new Intent(Intent.ACTION_SENDTO);
-        intent.setData(Uri.parse("mailto:" + FEEDBACK_EMAIL));
-        intent.putExtra(Intent.EXTRA_SUBJECT, "[명순 앱 의견] " + getCurrentScreenName());
-        intent.putExtra(Intent.EXTRA_TEXT, "피드백\n\n" + message + "\n\n화면\n\n" + getCurrentScreenName());
+    private void openFeedbackIssue(String message) {
+        openExternal(createFeedbackIssueUrl(message));
+    }
 
-        try {
-            startActivity(intent);
-        } catch (ActivityNotFoundException | SecurityException ignored) {
-            showErrorPanel();
-        }
+    private String createFeedbackIssueUrl(String message) {
+        String body = "## 피드백\n\n" + message + "\n\n## 화면\n\n" + getCurrentScreenName();
+        return Uri.parse(GITHUB_ISSUE_URL)
+                .buildUpon()
+                .appendQueryParameter("title", "[피드백] 앱 사용 의견")
+                .appendQueryParameter("body", body)
+                .build()
+                .toString();
     }
 
     private String getCurrentScreenName() {
