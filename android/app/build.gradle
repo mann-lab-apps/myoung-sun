@@ -1,14 +1,24 @@
 apply plugin: 'com.android.application'
 
+def feedbackEndpoint = (project.findProperty("MYOUNG_SUN_FEEDBACK_ENDPOINT") ?: "").toString()
+def escapedFeedbackEndpoint = feedbackEndpoint.replace("\\", "\\\\").replace("\"", "\\\"")
+def githubToken = (project.findProperty("MYOUNG_SUN_GITHUB_TOKEN") ?: "").toString()
+def escapedGithubToken = githubToken.replace("\\", "\\\\").replace("\"", "\\\"")
+
 android {
     namespace = "com.mannlab.myoungsun"
     compileSdk = rootProject.ext.compileSdkVersion
+    buildFeatures {
+        buildConfig true
+    }
     defaultConfig {
         applicationId "com.mannlab.myoungsun"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        buildConfigField "String", "FEEDBACK_ENDPOINT", "\"${escapedFeedbackEndpoint}\""
+        buildConfigField "String", "GITHUB_TOKEN", "\"${escapedGithubToken}\""
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

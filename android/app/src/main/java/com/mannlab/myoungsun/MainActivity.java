@@ -24,6 +24,7 @@ import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -37,6 +38,10 @@ import android.widget.Toast;
 
 import org.json.JSONObject;
 
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -44,6 +49,9 @@ import java.util.Map;
 public class MainActivity extends Activity {
     private static final String CHATGPT_URL = "https://chatgpt.com/?locale=ko-KR";
     private static final String GITHUB_ISSUE_URL = "https://github.com/mann-lab-apps/myoung-sun/issues/new";
+    private static final String GITHUB_API_ISSUES_URL = "https://api.github.com/repos/mann-lab-apps/myoung-sun/issues";
+    private static final String FEEDBACK_ENDPOINT = BuildConfig.FEEDBACK_ENDPOINT;
+    private static final String GITHUB_TOKEN = BuildConfig.GITHUB_TOKEN;
     private static final String STATE_SCREEN = "screen";
     private static final String STATE_CURRENT_URL = "currentUrl";
     private static final String STATE_GUIDE_STEP_INDEX = "guideStepIndex";
@@ -387,6 +395,15 @@ public class MainActivity extends Activity {
             }
 
             @Override
+            public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
+                if (request.isForMainFrame() && errorResponse != null && errorResponse.getStatusCode() >= 400) {
+                    hasMainFrameLoadError = true;
+                    loading.setVisibility(View.GONE);
+                    showErrorPanel();
+                }
+            }
+
+            @Override
             public void onPageFinished(WebView view, String url) {
                 currentUrl = url;
                 loading.setVisibility(View.GONE);
@@ -452,14 +469,13 @@ public class MainActivity extends Activity {
                 + "document.addEventListener('keydown',function(event){"
                 + "if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing&&isEditable(event.target)){notify('enter');}"
                 + "},true);"
-                + "document.addEventListener('submit',function(){notify('submit');},true);"
                 + "document.addEventListener('click',function(event){"
                 + "var target=event.target;"
                 + "var button=target&&target.closest?target.closest('button,[role=\"button\"]'):null;"
                 + "if(!button){return;}"
                 + "var label=[button.getAttribute('aria-label'),button.getAttribute('data-testid'),button.getAttribute('title'),button.getAttribute('type'),button.textContent]"
                 + ".filter(Boolean).join(' ').toLowerCase();"
-                + "if(label.indexOf('send')>-1||label.indexOf('submit')>-1||label.indexOf('보내')>-1){notify('button');}"
+                + "if(label.indexOf('send')>-1||label.indexOf('보내')>-1){notify('button');}"
                 + "},true);"
                 + "})();";
         webView.evaluateJavascript(script, null);
@@ -469,6 +485,11 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void onPromptSubmitted(String reason) {
             runOnUiThread(() -> handlePromptSubmitted());
+        }
+
+        @JavascriptInterface
+        public void onPromptAutoSendFailed() {
+            runOnUiThread(() -> Toast.makeText(MainActivity.this, "전송 버튼을 찾지 못했어요. 직접 눌러주세요.", Toast.LENGTH_SHORT).show());
         }
     }
 
@@ -499,6 +520,7 @@ public class MainActivity extends Activity {
         String script = "(function(){"
                 + "var prompt=" + JSONObject.quote(prompt) + ";"
                 + "function fire(target,type){target.dispatchEvent(new Event(type,{bubbles:true,cancelable:true}));}"
+                + "function fail(){try{window.MyoungSoonGuide.onPromptAutoSendFailed();}catch(e){}}"
                 + "function findEditor(){"
                 + "var selectors=['#prompt-textarea','textarea','[contenteditable=\"true\"]','[role=\"textbox\"]'];"
                 + "for(var i=0;i<selectors.length;i++){var el=document.querySelector(selectors[i]);if(el){return el;}}"
@@ -514,16 +536,16 @@ public class MainActivity extends Activity {
                 + "return true;"
                 + "}"
                 + "function findSendButton(){"
-                + "var selectors=['button[data-testid=\"send-button\"]','button[aria-label*=\"Send\"]','button[aria-label*=\"보내\"]','button[type=\"submit\"]'];"
+                + "var selectors=['button[data-testid=\"send-button\"]','button[aria-label*=\"Send\"]','button[aria-label*=\"send\"]','button[aria-label*=\"보내\"]'];"
                 + "for(var i=0;i<selectors.length;i++){var button=document.querySelector(selectors[i]);if(button&&!button.disabled){return button;}}"
                 + "var buttons=[].slice.call(document.querySelectorAll('button,[role=\"button\"]'));"
-                + "for(var j=0;j<buttons.length;j++){var b=buttons[j];var label=[b.getAttribute('aria-label'),b.getAttribute('data-testid'),b.getAttribute('title'),b.textContent].filter(Boolean).join(' ').toLowerCase();if(!b.disabled&&(label.indexOf('send')>-1||label.indexOf('submit')>-1||label.indexOf('보내')>-1)){return b;}}"
+                + "for(var j=0;j<buttons.length;j++){var b=buttons[j];var label=[b.getAttribute('aria-label'),b.getAttribute('data-testid'),b.getAttribute('title'),b.textContent].filter(Boolean).join(' ').toLowerCase();if(!b.disabled&&(label.indexOf('send')>-1||label.indexOf('보내')>-1)){return b;}}"
                 + "return null;"
                 + "}"
                 + "var editor=findEditor();"
                 + "if(!editor){return false;}"
                 + "setPrompt(editor);"
-                + "setTimeout(function(){var button=findSendButton();if(button){button.click();}},450);"
+                + "setTimeout(function(){var button=findSendButton();if(button){button.click();}else{fail();}},450);"
                 + "return true;"
                 + "})();";
 
@@ -850,7 +872,7 @@ public class MainActivity extends Activity {
         TextView title = createText("의견 보내기", 28, Color.rgb(23, 33, 31));
         panel.addView(title);
 
-        TextView body = createText("GitHub 이슈 작성 화면으로 열립니다. 내용을 확인한 뒤 등록 버튼을 눌러주세요.", 19, Color.rgb(51, 64, 61));
+        TextView body = createText("앱에서 바로 GitHub 이슈로 등록합니다. 실패하면 작성 화면으로 이어집니다.", 19, Color.rgb(51, 64, 61));
         body.setPadding(0, dp(8), 0, dp(12));
         panel.addView(body);
 
@@ -882,7 +904,7 @@ public class MainActivity extends Activity {
         Button cancelButton = createSecondaryButton("닫기");
         cancelButton.setOnClickListener(v -> dialog.dismiss());
 
-        Button sendButton = createButton("이슈 작성하기");
+        Button sendButton = createButton("이슈 등록하기");
         sendButton.setOnClickListener(v -> {
             String message = input.getText().toString().trim();
             if (message.isEmpty()) {
@@ -934,7 +956,7 @@ public class MainActivity extends Activity {
         TextView title = createText("이슈로 남길게요", 28, Color.rgb(23, 33, 31));
         panel.addView(title);
 
-        TextView body = createText("GitHub 이슈 작성 화면으로 이동합니다. 비밀번호, 인증번호, 개인 정보가 없으면 계속하세요.", 19, Color.rgb(51, 64, 61));
+        TextView body = createText("앱에서 바로 등록합니다. 비밀번호, 인증번호, 개인 정보가 없으면 계속하세요.", 19, Color.rgb(51, 64, 61));
         body.setPadding(0, dp(8), 0, dp(12));
         panel.addView(body);
 
@@ -944,11 +966,12 @@ public class MainActivity extends Activity {
         Button cancelButton = createSecondaryButton("다시 쓰기");
         cancelButton.setOnClickListener(v -> confirmDialog.dismiss());
 
-        Button continueButton = createButton("GitHub 열기");
+        Button continueButton = createButton("등록하기");
         continueButton.setOnClickListener(v -> {
-            confirmDialog.dismiss();
-            feedbackDialog.dismiss();
-            openFeedbackIssue(message);
+            continueButton.setEnabled(false);
+            continueButton.setAlpha(0.45f);
+            continueButton.setText("등록 중");
+            submitFeedbackIssue(message, feedbackDialog, confirmDialog, continueButton);
         });
 
         LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
@@ -979,18 +1002,150 @@ public class MainActivity extends Activity {
         return Math.max(dp(320), screenWidth - (horizontalMargin * 2));
     }
 
+    private void submitFeedbackIssue(String message, Dialog feedbackDialog, Dialog confirmDialog, Button continueButton) {
+        String screenName = getCurrentScreenName();
+        if (FEEDBACK_ENDPOINT == null || FEEDBACK_ENDPOINT.trim().isEmpty()) {
+            if (GITHUB_TOKEN != null && !GITHUB_TOKEN.trim().isEmpty()) {
+                submitFeedbackIssueWithToken(message, screenName, feedbackDialog, confirmDialog, continueButton);
+                return;
+            }
+
+            confirmDialog.dismiss();
+            feedbackDialog.dismiss();
+            Toast.makeText(this, "등록 토큰이 없어 GitHub 화면으로 열게요.", Toast.LENGTH_LONG).show();
+            openFeedbackIssue(message);
+            return;
+        }
+
+        new Thread(() -> {
+            boolean success = sendFeedbackIssueRequest(message, screenName);
+            runOnUiThread(() -> {
+                if (success) {
+                    confirmDialog.dismiss();
+                    feedbackDialog.dismiss();
+                    Toast.makeText(this, "의견을 이슈로 등록했어요.", Toast.LENGTH_LONG).show();
+                    return;
+                }
+
+                continueButton.setEnabled(true);
+                continueButton.setAlpha(1f);
+                continueButton.setText("GitHub 열기");
+                Toast.makeText(this, "바로 등록하지 못해 GitHub 화면으로 열게요.", Toast.LENGTH_LONG).show();
+                confirmDialog.dismiss();
+                feedbackDialog.dismiss();
+                openFeedbackIssue(message);
+            });
+        }).start();
+    }
+
+    private void submitFeedbackIssueWithToken(String message, String screenName, Dialog feedbackDialog, Dialog confirmDialog, Button continueButton) {
+        new Thread(() -> {
+            boolean success = sendGithubIssueRequest(message, screenName);
+            runOnUiThread(() -> {
+                if (success) {
+                    confirmDialog.dismiss();
+                    feedbackDialog.dismiss();
+                    Toast.makeText(this, "의견을 이슈로 등록했어요.", Toast.LENGTH_LONG).show();
+                    return;
+                }
+
+                continueButton.setEnabled(true);
+                continueButton.setAlpha(1f);
+                continueButton.setText("GitHub 열기");
+                Toast.makeText(this, "바로 등록하지 못해 GitHub 화면으로 열게요.", Toast.LENGTH_LONG).show();
+                confirmDialog.dismiss();
+                feedbackDialog.dismiss();
+                openFeedbackIssue(message);
+            });
+        }).start();
+    }
+
+    private boolean sendFeedbackIssueRequest(String message, String screenName) {
+        HttpURLConnection connection = null;
+        try {
+            JSONObject payload = new JSONObject();
+            payload.put("message", message);
+            payload.put("screen", screenName);
+
+            byte[] body = payload.toString().getBytes(StandardCharsets.UTF_8);
+            URL url = new URL(FEEDBACK_ENDPOINT);
+            connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setConnectTimeout(7000);
+            connection.setReadTimeout(10000);
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Accept", "application/json");
+            connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+            connection.setFixedLengthStreamingMode(body.length);
+
+            OutputStream outputStream = connection.getOutputStream();
+            outputStream.write(body);
+            outputStream.flush();
+            outputStream.close();
+
+            int responseCode = connection.getResponseCode();
+            return responseCode >= 200 && responseCode < 300;
+        } catch (Exception ignored) {
+            return false;
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
+    private boolean sendGithubIssueRequest(String message, String screenName) {
+        HttpURLConnection connection = null;
+        try {
+            JSONObject payload = new JSONObject();
+            payload.put("title", "[피드백] 앱 사용 의견");
+            payload.put("body", createFeedbackIssueBody(message, screenName));
+
+            byte[] body = payload.toString().getBytes(StandardCharsets.UTF_8);
+            URL url = new URL(GITHUB_API_ISSUES_URL);
+            connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setConnectTimeout(7000);
+            connection.setReadTimeout(10000);
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Accept", "application/vnd.github+json");
+            connection.setRequestProperty("Authorization", "Bearer " + GITHUB_TOKEN);
+            connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+            connection.setRequestProperty("User-Agent", "myoung-sun-android");
+            connection.setRequestProperty("X-GitHub-Api-Version", "2022-11-28");
+            connection.setFixedLengthStreamingMode(body.length);
+
+            OutputStream outputStream = connection.getOutputStream();
+            outputStream.write(body);
+            outputStream.flush();
+            outputStream.close();
+
+            int responseCode = connection.getResponseCode();
+            return responseCode >= 200 && responseCode < 300;
+        } catch (Exception ignored) {
+            return false;
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
     private void openFeedbackIssue(String message) {
         openExternal(createFeedbackIssueUrl(message));
     }
 
     private String createFeedbackIssueUrl(String message) {
-        String body = "## 피드백\n\n" + message + "\n\n## 화면\n\n" + getCurrentScreenName();
         return Uri.parse(GITHUB_ISSUE_URL)
                 .buildUpon()
                 .appendQueryParameter("title", "[피드백] 앱 사용 의견")
-                .appendQueryParameter("body", body)
+                .appendQueryParameter("body", createFeedbackIssueBody(message, getCurrentScreenName()))
                 .build()
                 .toString();
+    }
+
+    private String createFeedbackIssueBody(String message, String screenName) {
+        return "## 피드백\n\n" + message + "\n\n## 화면\n\n" + screenName;
     }
 
     private String getCurrentScreenName() {
