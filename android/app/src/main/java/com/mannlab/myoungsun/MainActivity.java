@@ -31,6 +31,7 @@ import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -52,31 +53,42 @@ public class MainActivity extends Activity {
     private static final String GITHUB_API_ISSUES_URL = "https://api.github.com/repos/mann-lab-apps/myoung-sun/issues";
     private static final String FEEDBACK_ENDPOINT = BuildConfig.FEEDBACK_ENDPOINT;
     private static final String GITHUB_TOKEN = BuildConfig.GITHUB_TOKEN;
+    private static final String PREFS_NAME = "myoungSoonPrefs";
+    private static final String PREF_GPT_GUIDE_COMPLETED = "gptGuideCompleted";
     private static final String STATE_SCREEN = "screen";
     private static final String STATE_CURRENT_URL = "currentUrl";
     private static final String STATE_GUIDE_STEP_INDEX = "guideStepIndex";
+    private static final String STATE_GUIDE_FURTHEST_STEP_INDEX = "guideFurthestStepIndex";
     private static final String STATE_INTRO_STEP_INDEX = "introStepIndex";
     private static final String STATE_MAIN_FRAME_LOAD_ERROR = "mainFrameLoadError";
+    private static final int INTRO_LAST_INDEX = 3;
+    private static final String WEATHER_PROMPT = "오늘 제주도 날씨는 어때?";
     private static final Map<String, String> KOREAN_HEADERS = new HashMap<String, String>() {{
         put("Accept-Language", "ko-KR,ko;q=0.9,en-US;q=0.6,en;q=0.5");
     }};
     private static final String[] GUIDE_TITLES = {
-            "첫 대화 시작해보기",
-            "요즘 날씨 물어보기",
-            "내 기분 알려주기",
-            "고민 털어놓기",
+            "대화창 터치하기",
+            "\"안녕\" 인사하기",
+            "\"오늘 제주도 날씨는 어때?\" 질문하기",
+            "오늘 내 기분 알려주기",
+            "내 고민 얘기하기",
             "축하합니다"
     };
     private static final String[] GUIDE_BODIES = {
+            "\"무엇이든 물어보세요\"를 터치해보세요.",
             "\"안녕\"하고 인사해보세요.",
-            "\"요즘 제주도 날씨는 어때?\"하고 물어보세요.",
-            "내 기분을 직접 입력해보세요!",
-            "고민을 직접 입력해보세요!",
+            "\"무엇이든 물어보세요\"를 터치하고 \"" + WEATHER_PROMPT + "\"라고 입력해보세요.",
+            "오늘 내 기분을 알려주세요.\n예: \"오늘 내 기분은 00해\"",
+            "내 고민을 편하게 얘기해보세요.",
             "GPT와 대화하기에 성공했습니다!\nGPT와 자유롭게 대화해보세요 :)"
     };
     private static final String[] GUIDE_AUTO_PROMPTS = {
+            null,
             "안녕",
-            "요즘 제주도 날씨는 어때?"
+            null,
+            null,
+            null,
+            null
     };
 
     private enum Screen {
@@ -90,20 +102,26 @@ public class MainActivity extends Activity {
     private LinearLayout errorPanel;
     private String currentUrl = CHATGPT_URL;
     private boolean hasMainFrameLoadError = false;
+    private boolean isGptGuideCompleted = false;
     private long lastPromptSubmitAtMillis = 0L;
+    private long lastPromptFocusAtMillis = 0L;
     private int guideStepIndex = 0;
+    private int guideFurthestStepIndex = 0;
     private int introStepIndex = 0;
     private TextView guideProgressText;
     private TextView guideTitleText;
     private TextView guideBodyText;
     private Button guidePrevButton;
     private Button guideNextButton;
-    private Button guideSelectionButton;
+    private Button guideInsertPromptButton;
+    private Button guideChatGptPageButton;
+    private TextView guideSuccessFeedbackText;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Locale.setDefault(Locale.KOREA);
+        isGptGuideCompleted = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean(PREF_GPT_GUIDE_COMPLETED, false);
         if (!restoreScreen(savedInstanceState)) {
             showHomeScreen();
         }
@@ -116,6 +134,7 @@ public class MainActivity extends Activity {
         outState.putString(STATE_SCREEN, currentScreen.name());
         outState.putString(STATE_CURRENT_URL, currentUrl);
         outState.putInt(STATE_GUIDE_STEP_INDEX, guideStepIndex);
+        outState.putInt(STATE_GUIDE_FURTHEST_STEP_INDEX, guideFurthestStepIndex);
         outState.putInt(STATE_INTRO_STEP_INDEX, introStepIndex);
         outState.putBoolean(STATE_MAIN_FRAME_LOAD_ERROR, hasMainFrameLoadError);
     }
@@ -199,6 +218,14 @@ public class MainActivity extends Activity {
         chooseTitle.setPadding(0, dp(8), 0, dp(4));
         root.addView(chooseTitle);
 
+        TextView completedCount = createText(
+                "성공한 가이드 " + getCompletedGuideCount() + " / " + getAvailableGuideCount() + "개",
+                19,
+                Color.rgb(51, 64, 61)
+        );
+        completedCount.setPadding(0, 0, 0, dp(6));
+        root.addView(completedCount);
+
         ScrollView guideScrollView = new ScrollView(this);
         guideScrollView.setFillViewport(false);
         guideScrollView.setBackgroundColor(Color.rgb(251, 248, 241));
@@ -211,11 +238,13 @@ public class MainActivity extends Activity {
                 "GPT와 대화하기",
                 "대화 화면을 크게 엽니다.",
                 true,
+                isGptGuideCompleted,
                 v -> showGptScreen(true)
         ));
         guideList.addView(createHomeItem(
                 "카카오톡 길라잡이",
                 "곧 추가됩니다.",
+                false,
                 false,
                 null
         ));
@@ -288,6 +317,7 @@ public class MainActivity extends Activity {
         if (resetToChatGptHome) {
             currentUrl = CHATGPT_URL;
             guideStepIndex = 0;
+            guideFurthestStepIndex = isGptGuideCompleted ? GUIDE_TITLES.length - 1 : 0;
             hasMainFrameLoadError = false;
         }
         destroyChatWebView();
@@ -466,10 +496,15 @@ public class MainActivity extends Activity {
                 + "return target.tagName==='TEXTAREA'||target.tagName==='INPUT'||target.isContentEditable||"
                 + "(target.closest&&target.closest('[contenteditable=\"true\"]'));"
                 + "}"
+                + "function notifyFocus(target){"
+                + "if(isEditable(target)){try{window.MyoungSoonGuide.onPromptFocused();}catch(e){}}"
+                + "}"
+                + "document.addEventListener('focusin',function(event){notifyFocus(event.target);},true);"
                 + "document.addEventListener('keydown',function(event){"
                 + "if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing&&isEditable(event.target)){notify('enter');}"
                 + "},true);"
                 + "document.addEventListener('click',function(event){"
+                + "notifyFocus(event.target);"
                 + "var target=event.target;"
                 + "var button=target&&target.closest?target.closest('button,[role=\"button\"]'):null;"
                 + "if(!button){return;}"
@@ -485,6 +520,11 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void onPromptSubmitted(String reason) {
             runOnUiThread(() -> handlePromptSubmitted());
+        }
+
+        @JavascriptInterface
+        public void onPromptFocused() {
+            runOnUiThread(() -> handlePromptFocused());
         }
 
         @JavascriptInterface
@@ -506,9 +546,33 @@ public class MainActivity extends Activity {
 
         int lastIndex = GUIDE_TITLES.length - 1;
         if (guideStepIndex < lastIndex) {
-            guideStepIndex++;
-            updateGuideText();
+            advanceGuideStep();
         }
+    }
+
+    private void handlePromptFocused() {
+        if (currentScreen != Screen.GPT || guideStepIndex != 0) {
+            return;
+        }
+
+        long now = System.currentTimeMillis();
+        if (now - lastPromptFocusAtMillis < 1000) {
+            return;
+        }
+        lastPromptFocusAtMillis = now;
+
+        advanceGuideStep();
+    }
+
+    private void advanceGuideStep() {
+        int lastIndex = GUIDE_TITLES.length - 1;
+        if (guideStepIndex >= lastIndex) {
+            return;
+        }
+
+        guideStepIndex++;
+        guideFurthestStepIndex = Math.max(guideFurthestStepIndex, guideStepIndex);
+        updateGuideText();
     }
 
     private void sendGuidePromptForCurrentStep() {
@@ -564,7 +628,15 @@ public class MainActivity extends Activity {
         return GUIDE_AUTO_PROMPTS[stepIndex];
     }
 
-    private View createHomeItem(String title, String body, boolean enabled, View.OnClickListener listener) {
+    private int getCompletedGuideCount() {
+        return isGptGuideCompleted ? 1 : 0;
+    }
+
+    private int getAvailableGuideCount() {
+        return 1;
+    }
+
+    private View createHomeItem(String title, String body, boolean enabled, boolean completed, View.OnClickListener listener) {
         LinearLayout item = new LinearLayout(this);
         item.setOrientation(LinearLayout.VERTICAL);
         item.setPadding(dp(18), dp(18), dp(18), dp(16));
@@ -584,11 +656,32 @@ public class MainActivity extends Activity {
         params.setMargins(0, dp(10), 0, dp(10));
         item.setLayoutParams(params);
 
+        LinearLayout titleRow = new LinearLayout(this);
+        titleRow.setOrientation(LinearLayout.HORIZONTAL);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
+
         TextView itemTitle = createText(title, 26, enabled ? Color.rgb(23, 33, 31) : Color.rgb(72, 78, 76));
+        titleRow.addView(itemTitle, new LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f
+        ));
+
+        if (completed) {
+            TextView completedBadge = createPillLabel("성공", true);
+            completedBadge.setContentDescription(title + " 성공 완료");
+            LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+            badgeParams.setMargins(dp(10), 0, 0, 0);
+            titleRow.addView(completedBadge, badgeParams);
+        }
+
         TextView itemBody = createText(body, 19, enabled ? Color.rgb(51, 64, 61) : Color.rgb(86, 94, 90));
         itemBody.setPadding(0, dp(8), 0, 0);
 
-        item.addView(itemTitle);
+        item.addView(titleRow);
         item.addView(itemBody);
 
         TextView action = createPillLabel(enabled ? "시작하기" : "준비 중", enabled);
@@ -625,15 +718,23 @@ public class MainActivity extends Activity {
     private View createCurrentIntroSection() {
         if (introStepIndex == 1) {
             return createIntroScreenSection(
-                    "2. GPT 가이드 첫 화면",
-                    "ChatGPT 화면을 보면서 오른쪽 안내를 읽습니다. 준비되면 다음을 눌러요.",
-                    createGuideFirstStepPreview()
+                    "2. 조작화면",
+                    "가이드에서 소개하는 서비스의 화면입니다. 실제 서비스처럼 직접 사용해볼 수 있습니다.",
+                    createGuideControlPreview()
             );
         }
 
         if (introStepIndex == 2) {
             return createIntroScreenSection(
-                    "3. 가이드 완료 화면",
+                    "3. 안내",
+                    "서비스를 사용해볼 수 있도록 도전을 제시하고 방법을 안내해 드립니다.",
+                    createGuideInstructionPreview()
+            );
+        }
+
+        if (introStepIndex == 3) {
+            return createIntroScreenSection(
+                    "4. 가이드 완료 화면",
                     "마지막 단계에서는 털어놓고 싶은 고민을 편하게 이야기해봅니다.",
                     createGuideCompletePreview()
             );
@@ -650,7 +751,7 @@ public class MainActivity extends Activity {
         LinearLayout section = new LinearLayout(this);
         section.setOrientation(LinearLayout.VERTICAL);
         section.setPadding(dp(14), dp(14), dp(14), dp(14));
-        section.setBackground(createGuideItemBackground(true));
+        section.setBackgroundColor(Color.rgb(251, 248, 241));
 
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -670,53 +771,45 @@ public class MainActivity extends Activity {
     }
 
     private View createGuideSelectionPreview() {
-        LinearLayout preview = createScreenshotPreview();
-        preview.addView(createPreviewHeader("명순님, 무엇을 도와드릴까요?", "앱 소개"));
-        preview.addView(createPreviewCaption("가이드를 선택하세요", 16, Color.rgb(23, 33, 31)));
-        preview.addView(createPreviewCard("GPT와 대화하기", "대화 화면을 크게 엽니다.", "시작하기", true));
-        preview.addView(createPreviewCard("카카오톡 길라잡이", "곧 추가됩니다.", "준비 중", false));
-        return preview;
+        return createScreenshotImage(R.drawable.intro_home, "가이드 선택 화면 스크린샷");
     }
 
-    private View createGuideFirstStepPreview() {
-        LinearLayout preview = createScreenshotPreview();
-        preview.addView(createPreviewHeader("GPT와 대화하기", ""));
+    private View createGuideControlPreview() {
+        return createScreenshotImage(R.drawable.intro_gpt_control, "ChatGPT 조작화면 스크린샷");
+    }
 
-        LinearLayout content = new LinearLayout(this);
-        content.setOrientation(LinearLayout.HORIZONTAL);
-        content.setPadding(0, dp(8), 0, 0);
-
-        TextView webArea = createPreviewPane("ChatGPT 화면");
-        LinearLayout guideArea = createPreviewGuidePane("1 / 5", "첫 대화 시작해보기", "\"안녕\"하고 인사해보세요.", true, "\"안녕\" 전송", true);
-        content.addView(webArea, new LinearLayout.LayoutParams(0, dp(154), 1.15f));
-
-        LinearLayout.LayoutParams guideParams = new LinearLayout.LayoutParams(0, dp(154), 0.85f);
-        guideParams.setMargins(dp(8), 0, 0, 0);
-        content.addView(guideArea, guideParams);
-        preview.addView(content);
-        return preview;
+    private View createGuideInstructionPreview() {
+        return createScreenshotImage(R.drawable.intro_gpt_instruction, "가이드 안내 영역 스크린샷");
     }
 
     private View createGuideCompletePreview() {
-        LinearLayout preview = createScreenshotPreview();
-        preview.addView(createPreviewHeader("GPT와 대화하기", "마지막 단계"));
+        return createScreenshotImage(R.drawable.intro_gpt_complete, "가이드 완료 화면 스크린샷");
+    }
 
-        LinearLayout guideArea = createPreviewGuidePane("5 / 5", "축하합니다", "GPT와 대화하기에 성공했습니다!\nGPT와 자유롭게 대화해보세요 :)", false, "완료", false);
-        TextView selectionButton = createPreviewPill("가이드 선택하기", true);
-        LinearLayout.LayoutParams selectionParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        selectionParams.setMargins(0, dp(8), 0, 0);
-        guideArea.addView(selectionButton, selectionParams);
+    private View createScreenshotImage(int drawableResId, String description) {
+        FrameLayout frame = new FrameLayout(this);
+        frame.setPadding(dp(6), dp(6), dp(6), dp(6));
+        frame.setBackground(createPreviewBackground(Color.rgb(251, 248, 241), Color.rgb(180, 176, 166)));
+        frame.setContentDescription(description);
 
-        LinearLayout.LayoutParams guideParams = new LinearLayout.LayoutParams(
+        ImageView image = new ImageView(this);
+        image.setImageResource(drawableResId);
+        image.setAdjustViewBounds(true);
+        image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        image.setContentDescription(description);
+        frame.addView(image, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(210)
+                ViewGroup.LayoutParams.MATCH_PARENT
+        ));
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(560)
         );
-        guideParams.setMargins(0, dp(8), 0, 0);
-        preview.addView(guideArea, guideParams);
-        return preview;
+        params.width = Math.min(getResources().getDisplayMetrics().widthPixels - dp(88), dp(430));
+        params.gravity = Gravity.CENTER_HORIZONTAL;
+        frame.setLayoutParams(params);
+        return frame;
     }
 
     private LinearLayout createScreenshotPreview() {
@@ -724,7 +817,15 @@ public class MainActivity extends Activity {
         preview.setOrientation(LinearLayout.VERTICAL);
         preview.setPadding(dp(10), dp(10), dp(10), dp(10));
         preview.setBackground(createPreviewBackground(Color.rgb(251, 248, 241), Color.rgb(180, 176, 166)));
+        preview.setMinimumHeight(dp(430));
         preview.setContentDescription("앱 화면 미리보기");
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        params.width = Math.min(getResources().getDisplayMetrics().widthPixels - dp(88), dp(430));
+        params.gravity = Gravity.CENTER_HORIZONTAL;
+        preview.setLayoutParams(params);
         return preview;
     }
 
@@ -754,7 +855,7 @@ public class MainActivity extends Activity {
 
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
+                dp(132)
         );
         params.setMargins(0, dp(8), 0, 0);
         card.setLayoutParams(params);
@@ -1187,12 +1288,12 @@ public class MainActivity extends Activity {
         });
 
         Button nextButton = createHeaderArrowButton("→", true);
-        boolean canGoNext = introStepIndex < 2;
+        boolean canGoNext = introStepIndex < INTRO_LAST_INDEX;
         nextButton.setEnabled(canGoNext);
         nextButton.setAlpha(canGoNext ? 1f : 0.45f);
         nextButton.setContentDescription(canGoNext ? "다음 소개 화면으로 갑니다" : "마지막 소개 화면입니다");
         nextButton.setOnClickListener(v -> {
-            if (introStepIndex < 2) {
+            if (introStepIndex < INTRO_LAST_INDEX) {
                 introStepIndex++;
                 showIntroScreen();
             }
@@ -1267,6 +1368,11 @@ public class MainActivity extends Activity {
         guideBodyText.setPadding(0, 0, 0, dp(14));
         panel.addView(guideBodyText);
 
+        guideInsertPromptButton = createSecondaryButton("\"" + WEATHER_PROMPT + "\" 입력하기");
+        guideInsertPromptButton.setContentDescription("오늘 제주도 날씨 질문 문구를 입력창에 넣습니다");
+        guideInsertPromptButton.setOnClickListener(v -> insertGuidePrompt(WEATHER_PROMPT));
+        panel.addView(guideInsertPromptButton);
+
         LinearLayout guideNav = new LinearLayout(this);
         guideNav.setOrientation(LinearLayout.HORIZONTAL);
         guideNav.setPadding(0, dp(4), 0, 0);
@@ -1283,7 +1389,13 @@ public class MainActivity extends Activity {
         guideNextButton = createGuideArrowButton("→", true);
         guideNextButton.setContentDescription("다음 단계로 갑니다");
         guideNextButton.setOnClickListener(v -> {
-            if (getAutoPromptForStep(guideStepIndex) != null) {
+            int lastIndex = GUIDE_TITLES.length - 1;
+            if (guideStepIndex == lastIndex) {
+                markGptGuideSucceeded();
+            } else if (guideStepIndex < guideFurthestStepIndex) {
+                guideStepIndex++;
+                updateGuideText();
+            } else if (getAutoPromptForStep(guideStepIndex) != null) {
                 sendGuidePromptForCurrentStep();
             }
         });
@@ -1292,10 +1404,16 @@ public class MainActivity extends Activity {
         guideNav.addView(guideNextButton);
         panel.addView(guideNav);
 
-        guideSelectionButton = createButton("가이드 선택하기");
-        guideSelectionButton.setContentDescription("가이드 선택 화면으로 돌아갑니다");
-        guideSelectionButton.setOnClickListener(v -> showHomeScreen());
-        panel.addView(guideSelectionButton);
+        guideChatGptPageButton = createButton("ChatGPT 페이지로 이동");
+        guideChatGptPageButton.setContentDescription("ChatGPT 첫 페이지로 이동합니다");
+        guideChatGptPageButton.setOnClickListener(v -> moveToChatGptPage());
+        panel.addView(guideChatGptPageButton);
+
+        guideSuccessFeedbackText = createText("성공했어요!", 22, Color.rgb(216, 91, 59));
+        guideSuccessFeedbackText.setGravity(Gravity.CENTER);
+        guideSuccessFeedbackText.setPadding(0, dp(10), 0, 0);
+        guideSuccessFeedbackText.setVisibility(View.GONE);
+        panel.addView(guideSuccessFeedbackText);
 
         updateGuideText();
         return panel;
@@ -1373,35 +1491,155 @@ public class MainActivity extends Activity {
             guidePrevButton.setContentDescription(canGoBack ? "이전 단계로 돌아갑니다" : "이전 단계가 없습니다");
         }
 
+        if (guideInsertPromptButton != null) {
+            boolean showInsertButton = guideStepIndex == 2;
+            guideInsertPromptButton.setVisibility(showInsertButton ? View.VISIBLE : View.GONE);
+        }
+
         if (guideNextButton != null) {
             String autoPrompt = getAutoPromptForStep(guideStepIndex);
-            boolean canSendPrompt = autoPrompt != null;
-            guideNextButton.setEnabled(canSendPrompt);
-            guideNextButton.setAlpha(canSendPrompt ? 1f : 0.45f);
-            if (canSendPrompt) {
+            boolean canMoveToSolvedStep = guideStepIndex < guideFurthestStepIndex;
+            boolean canUseNextButton = autoPrompt != null || canMoveToSolvedStep || isLastStep;
+            guideNextButton.setEnabled(canUseNextButton);
+            guideNextButton.setAlpha(canUseNextButton ? 1f : 0.45f);
+            if (canMoveToSolvedStep) {
+                guideNextButton.setText("다음 단계로");
+                guideNextButton.setTextSize(18);
+                guideNextButton.setMinHeight(dp(58));
+                guideNextButton.setContentDescription("이미 완료한 단계입니다. 다음 단계로 갑니다");
+            } else if (autoPrompt != null) {
                 String buttonText = "\"" + autoPrompt + "\" 전송하기";
                 guideNextButton.setText(buttonText);
                 guideNextButton.setTextSize(autoPrompt.length() > 8 ? 16 : 20);
+                guideNextButton.setMinHeight(dp(58));
                 guideNextButton.setContentDescription(buttonText);
+            } else if (guideStepIndex == 0) {
+                guideNextButton.setText("터치해보세요!");
+                guideNextButton.setTextSize(18);
+                guideNextButton.setMinHeight(dp(58));
+                guideNextButton.setContentDescription("대화창을 터치하면 다음 단계로 넘어갑니다");
             } else if (guideStepIndex == 2) {
                 guideNextButton.setText("직접 입력해보세요!");
-                guideNextButton.setTextSize(18);
-                guideNextButton.setContentDescription("내 기분을 직접 입력하면 다음 단계로 넘어갑니다");
+                guideNextButton.setTextSize(16);
+                guideNextButton.setMinHeight(dp(74));
+                guideNextButton.setContentDescription("날씨 질문을 직접 입력하면 다음 단계로 넘어갑니다");
             } else if (guideStepIndex == 3) {
                 guideNextButton.setText("직접 입력해보세요!");
-                guideNextButton.setTextSize(18);
-                guideNextButton.setContentDescription("고민을 직접 입력하면 완료 화면으로 넘어갑니다");
+                guideNextButton.setTextSize(16);
+                guideNextButton.setMinHeight(dp(74));
+                guideNextButton.setContentDescription("오늘 내 기분을 직접 입력하면 다음 단계로 넘어갑니다");
+            } else if (guideStepIndex == 4) {
+                guideNextButton.setText("직접 입력해보세요!");
+                guideNextButton.setTextSize(16);
+                guideNextButton.setMinHeight(dp(74));
+                guideNextButton.setContentDescription("내 고민을 직접 입력하면 완료 화면으로 넘어갑니다");
             } else {
-                guideNextButton.setText("완료");
+                guideNextButton.setText("성공");
                 guideNextButton.setTextSize(20);
-                guideNextButton.setContentDescription("마지막 단계입니다");
+                guideNextButton.setMinHeight(dp(58));
+                guideNextButton.setContentDescription("GPT와 대화하기 성공을 기록합니다");
             }
         }
 
-        if (guideSelectionButton != null) {
-            guideSelectionButton.setVisibility(isLastStep ? View.VISIBLE : View.GONE);
-            guideSelectionButton.setContentDescription("가이드 선택 화면으로 돌아갑니다");
+        if (guideChatGptPageButton != null) {
+            guideChatGptPageButton.setVisibility((isGptGuideCompleted || isLastStep) ? View.VISIBLE : View.GONE);
         }
+
+    }
+
+    private void markGptGuideSucceeded() {
+        isGptGuideCompleted = true;
+        guideFurthestStepIndex = GUIDE_TITLES.length - 1;
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                .edit()
+                .putBoolean(PREF_GPT_GUIDE_COMPLETED, true)
+                .apply();
+        updateGuideText();
+        playGuideSuccessAnimation();
+        Toast.makeText(this, "성공을 기록했어요.", Toast.LENGTH_SHORT).show();
+    }
+
+    private void playGuideSuccessAnimation() {
+        if (guideNextButton != null) {
+            guideNextButton.animate().cancel();
+            guideNextButton.setScaleX(1f);
+            guideNextButton.setScaleY(1f);
+            guideNextButton.animate()
+                    .scaleX(1.06f)
+                    .scaleY(1.06f)
+                    .setDuration(140)
+                    .withEndAction(() -> guideNextButton.animate()
+                            .scaleX(1f)
+                            .scaleY(1f)
+                            .setDuration(160)
+                            .start())
+                    .start();
+        }
+
+        if (guideSuccessFeedbackText != null) {
+            guideSuccessFeedbackText.animate().cancel();
+            guideSuccessFeedbackText.setVisibility(View.VISIBLE);
+            guideSuccessFeedbackText.setAlpha(0f);
+            guideSuccessFeedbackText.setTranslationY(dp(8));
+            guideSuccessFeedbackText.setScaleX(0.92f);
+            guideSuccessFeedbackText.setScaleY(0.92f);
+            guideSuccessFeedbackText.animate()
+                    .alpha(1f)
+                    .translationY(0f)
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .setDuration(220)
+                    .withEndAction(() -> guideSuccessFeedbackText.animate()
+                            .alpha(0f)
+                            .translationY(-dp(6))
+                            .setStartDelay(1300)
+                            .setDuration(420)
+                            .withEndAction(() -> guideSuccessFeedbackText.setVisibility(View.GONE))
+                            .start())
+                    .start();
+        }
+    }
+
+    private void moveToChatGptPage() {
+        openExternal(CHATGPT_URL);
+    }
+
+    private void insertGuidePrompt(String prompt) {
+        if (chatWebView == null || prompt == null) {
+            Toast.makeText(this, "입력창을 찾지 못했어요. 직접 입력해주세요.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String script = "(function(){"
+                + "var prompt=" + JSONObject.quote(prompt) + ";"
+                + "function fire(target,type){target.dispatchEvent(new Event(type,{bubbles:true,cancelable:true}));}"
+                + "function findEditor(){"
+                + "var selectors=['#prompt-textarea','textarea','[contenteditable=\"true\"]','[role=\"textbox\"]'];"
+                + "for(var i=0;i<selectors.length;i++){var el=document.querySelector(selectors[i]);if(el){return el;}}"
+                + "return null;"
+                + "}"
+                + "function setPrompt(editor){"
+                + "editor.focus();"
+                + "var tag=(editor.tagName||'').toUpperCase();"
+                + "if(tag==='TEXTAREA'||tag==='INPUT'){editor.value=prompt;fire(editor,'input');fire(editor,'change');return true;}"
+                + "try{document.execCommand('selectAll',false,null);document.execCommand('insertText',false,prompt);}catch(e){}"
+                + "if((editor.innerText||editor.textContent||'').trim()!==prompt.trim()){editor.textContent=prompt;}"
+                + "fire(editor,'input');fire(editor,'change');"
+                + "return true;"
+                + "}"
+                + "var editor=findEditor();"
+                + "if(!editor){return false;}"
+                + "setPrompt(editor);"
+                + "return true;"
+                + "})();";
+
+        chatWebView.evaluateJavascript(script, value -> {
+            if ("true".equals(value)) {
+                Toast.makeText(this, "입력창에 넣었어요.", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "입력창을 찾지 못했어요. 직접 입력해주세요.", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private Button createHeaderBackButton() {
@@ -1570,6 +1808,11 @@ public class MainActivity extends Activity {
             currentScreen = Screen.valueOf(savedScreen);
             currentUrl = savedInstanceState.getString(STATE_CURRENT_URL, CHATGPT_URL);
             guideStepIndex = clampGuideStepIndex(savedInstanceState.getInt(STATE_GUIDE_STEP_INDEX, 0));
+            guideFurthestStepIndex = clampGuideStepIndex(savedInstanceState.getInt(STATE_GUIDE_FURTHEST_STEP_INDEX, guideStepIndex));
+            guideFurthestStepIndex = Math.max(guideFurthestStepIndex, guideStepIndex);
+            if (isGptGuideCompleted) {
+                guideFurthestStepIndex = GUIDE_TITLES.length - 1;
+            }
             introStepIndex = clampIntroStepIndex(savedInstanceState.getInt(STATE_INTRO_STEP_INDEX, 0));
             hasMainFrameLoadError = savedInstanceState.getBoolean(STATE_MAIN_FRAME_LOAD_ERROR, false);
 
@@ -1585,6 +1828,7 @@ public class MainActivity extends Activity {
             currentScreen = Screen.HOME;
             currentUrl = CHATGPT_URL;
             guideStepIndex = 0;
+            guideFurthestStepIndex = 0;
             introStepIndex = 0;
             hasMainFrameLoadError = false;
             return false;
@@ -1605,7 +1849,7 @@ public class MainActivity extends Activity {
             return 0;
         }
 
-        return Math.min(index, 2);
+        return Math.min(index, INTRO_LAST_INDEX);
     }
 
     private void saveCurrentWebUrl() {
